@@ -124,7 +124,7 @@ Wednesday, 20. September 2017 07:21PM
 ---
 ### sidewalk
 * A sidewalk may be separated from the carriageway by only a curb, by a road verge or alternatively may be at some distance from the road (but still associated with it). It also may be separated from the road by some form of barrier, for example bushes or a line of trees. A road may have a sidewalk on only one side of the carriageway, or both side or have no sidewalks. 
-* ```sidewalk=right/left/no/NULL```
+* ```sidewalk=both/right/left/no/NULL```
 
 ---
 ### turn_lanes
