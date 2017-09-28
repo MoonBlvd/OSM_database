@@ -1,3 +1,4 @@
 data
 *.osm.db
-
+*.html
+.ipynb_checkpoints

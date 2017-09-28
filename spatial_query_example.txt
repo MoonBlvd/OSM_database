@@ -1,0 +1,111 @@
+
+# non-spatial query
+
+SELECT count(rd.osm_id)
+FROM ("import.osm_roads") as rd,
+     cb_2016_us_county_500k as county
+WHERE within(ST_PointN(ST_Transform(rd.geometry,4326),1), county.geometry) and county.name="Washtenaw"
+
+
+# spatial query
+
+SELECT COUNT(rd.osm_id) as count
+FROM "import.osm_roads" as rd,
+cb_2016_us_county_500k as county
+WHERE rd.ROWID IN (
+    SELECT ROWID
+    FROM SpatialIndex
+    WHERE f_table_name = 'import.osm_roads' AND f_geometry_column = 'GEOMETRY' AND
+        search_frame = ST_Transform(ST_Envelope(SetSRID(county.geometry, 4326)), 3857) AND county.name="Washtenaw") 
+
+
+
+# spatial query works!
+SELECT COUNT(osm_id)
+FROM
+(
+SELECT rd.osm_id as osm_id, rd.geometry as geometry, county.geometry as ctgeometry
+FROM "import.osm_roads" as rd,
+cb_2016_us_county_500k as county
+WHERE rd.ROWID IN (
+    SELECT ROWID
+    FROM SpatialIndex
+    WHERE f_table_name = 'import.osm_roads' AND f_geometry_column = 'GEOMETRY' AND
+        search_frame = ST_Transform(ST_Envelope(SetSRID(county.geometry, 4326)), 3857) AND county.name="Washtenaw")
+)
+WHERE within(ST_PointN(ST_Transform(geometry,4326),1), ctgeometry)
+
+
+
+# create a new table 
+
+CREATE TABLE county_tunnel AS
+SELECT tunnel, name, ctgeometry
+FROM
+(
+SELECT rd.osm_id as osm_id, rd.geometry as geometry, rd.tunnel as tunnel, county.name as name, county.geometry as ctgeometry
+FROM "import.osm_roads" as rd,
+cb_2016_us_county_500k as county
+WHERE rd.ROWID IN (
+    SELECT ROWID
+    FROM SpatialIndex
+    WHERE f_table_name = 'import.osm_roads' AND f_geometry_column = 'GEOMETRY' AND
+        search_frame = ST_Transform(ST_Envelope(SetSRID(county.geometry, 4326)), 3857))
+)
+WHERE within(ST_PointN(ST_Transform(geometry,4326),1), ctgeometry)
+
+
+# count number of tunnels
+SELECT COUNT(*)
+FROM
+(
+SELECT tunnel as T, name as N, SetSRID(ctgeometry, 4326) as Geom
+FROM
+(	
+	SELECT rd.osm_id as osm_id, rd.geometry as geometry, rd.tunnel as tunnel, county.name as name, county.geometry as ctgeometry
+	FROM "import.osm_roads" as rd,
+	     cb_2016_us_county_500k as county
+	WHERE rd.ROWID IN (
+    		SELECT ROWID
+    		FROM SpatialIndex
+    		WHERE f_table_name = 'import.osm_roads' AND f_geometry_column = 'GEOMETRY' AND
+        	      search_frame = ST_Transform(ST_Envelope(SetSRID(county.geometry, 4326)), 3857))
+)
+WHERE within(ST_PointN(ST_Transform(geometry,4326),1), ctgeometry)
+)
+Where T!=''
+GROUP By N
+
+
+
+
+# create all USA tunnel data
+SELECT sum(num), name, Geom
+FROM 
+(
+	SELECT COUNT(*) as num, N as name, Geom
+	FROM
+	(
+	SELECT tunnel as T, name as N, SetSRID(ctgeometry, 4326) as Geom
+	FROM
+	(	
+		SELECT rd.osm_id as osm_id, rd.geometry as geometry, rd.tunnel as tunnel, county.name as name, county.geometry as ctgeometry
+		FROM "import.osm_roads" as rd,
+	     	cb_2016_us_county_500k as county
+		WHERE rd.ROWID IN (
+    			SELECT ROWID
+    			FROM SpatialIndex
+    			WHERE f_table_name = 'import.osm_roads' AND f_geometry_column = 'GEOMETRY' AND
+        	      	search_frame = ST_Transform(ST_Envelope(SetSRID(county.geometry, 4326)), 3857))
+	)
+	WHERE within(ST_PointN(ST_Transform(geometry,4326),1), ctgeometry)
+	)
+	Where T!=''
+	GROUP By Geom
+	UNION ALL
+	SELECT 0 as num, county.name as name, geometry as Geom
+	FROM cb_2016_us_county_500k as county
+)t
+
+GROUP By Geom
+
