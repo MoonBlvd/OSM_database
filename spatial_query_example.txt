@@ -80,7 +80,41 @@ GROUP By N
 
 
 # create all USA tunnel data
-SELECT sum(num), name, Geom
+
+SELECT sum(num) as num_tunnel, name as county_name, Geom as geometry
+FROM 
+(
+	SELECT COUNT(*) as num, N as name, Geom
+	FROM
+	(
+	SELECT tunnel as T, name as N, SetSRID(ctgeometry, 4326) as Geom
+	FROM
+	(	
+		SELECT rd.osm_id as osm_id, rd.geometry as geometry, rd.tunnel as tunnel, county.name as name, county.geometry as ctgeometry
+		FROM "import.osm_roads" as rd,
+	     	cb_2016_us_county_500k as county
+		WHERE rd.ROWID IN (
+    			SELECT ROWID
+    			FROM SpatialIndex
+    			WHERE f_table_name = 'import.osm_roads' AND f_geometry_column = 'GEOMETRY' AND
+        	      	search_frame = ST_Transform(ST_Envelope(SetSRID(county.geometry, 4326)), 3857))
+	)
+	WHERE within(ST_EndPoint(ST_Transform(geometry,4326)), ctgeometry) or within(ST_StartPoint(ST_Transform(geometry,4326)), ctgeometry)
+	)
+	Where T!=''
+	GROUP By Geom
+	UNION ALL
+	SELECT 0 as num, county.name as name, geometry as Geom
+	FROM cb_2016_us_county_500k as county
+)t
+
+GROUP By Geom
+
+# save to a new table
+
+CREATE TABLE county_tunnel
+AS
+SELECT sum(num) as num_tunnel, name as county_name, Geom as geometry
 FROM 
 (
 	SELECT COUNT(*) as num, N as name, Geom
@@ -108,4 +142,108 @@ FROM
 )t
 
 GROUP By Geom
+
+# compute area
+
+SELECT ST_Area(ST_Transform(ct.geometry,2249)) * POWER(0.3048,2)* POWER(0.000621371,2) as sqmile, ct.geometry as Geom
+FROM cb_2016_us_county_500k as ct
+
+# add tunnel dense
+
+SELECT tunnel.num_tunnel/ area.sqmile as tunnel_dense, tunnel.num_tunnel, tunnel.county_name, tunnel.geometry
+FROM
+(
+SELECT sum(num) as num_tunnel, name as county_name, Geom as geometry
+FROM 
+(
+	SELECT COUNT(*) as num, N as name, Geom
+	FROM
+	(
+		SELECT tunnel as T, name as N, SetSRID(ctgeometry, 4326) as Geom
+		FROM
+		(	
+			SELECT rd.osm_id as osm_id, rd.geometry as geometry, rd.tunnel as tunnel, county.name as name, county.geometry as ctgeometry
+			FROM "import.osm_roads" as rd,
+		     	cb_2016_us_county_500k as county
+			WHERE rd.ROWID IN (
+	    			SELECT ROWID
+	    			FROM SpatialIndex
+	    			WHERE f_table_name = 'import.osm_roads' AND f_geometry_column = 'GEOMETRY' AND
+			      	search_frame = ST_Transform(ST_Envelope(SetSRID(county.geometry, 4326)), 3857)
+			)
+		)
+		WHERE within(ST_EndPoint(ST_Transform(geometry,4326)), ctgeometry) or within(ST_StartPoint(ST_Transform(geometry,4326)), ctgeometry)
+	)
+	Where T!=''
+	GROUP By Geom
+	UNION ALL
+	SELECT 0 as num, county.name as name, geometry as Geom
+	FROM cb_2016_us_county_500k as county
+)t
+GROUP By Geom
+) as tunnel,
+(
+SELECT ST_Area(ST_Transform(ct.geometry,2249)) * POWER(0.3048,2)* POWER(0.000621371,2) as sqmile, ct.geometry as Geom
+FROM cb_2016_us_county_500k as ct
+)as area
+WHERE tunnel.geometry=area.Geom
+
+
+# CREATE A COUNTY ACCIDENT TABLE 
+
+
+CREATE TABLE county_accident
+AS
+SELECT count(*) as num_accident, ct_Geom as geometry
+FROM(	
+	SELECT ac_Geom as acGeom, ct_Geom as ct_Geom
+	FROM(
+		SELECT ac.geometry as ac_Geom, ct.geometry as ct_Geom
+		FROM county_tunnel_info as ct,
+     	     	     Fatal_Motor_Vehicle_Accidents as ac
+		WHERE ac.ROWID IN(
+			SELECT ROWID
+			FROM SpatialIndex
+			WHERE f_table_name = 'Fatal_Motor_Vehicle_Accidents' AND f_geometry_column = 'GEOMETRY' AND
+		      	      search_frame = ST_Envelope(SetSRID(ct.geometry, 4326))
+		)
+	)
+	WHERE within(ac_Geom, ct_Geom)
+)
+GROUP By geometry
+
+
+
+
+# CREATE COUNTY ACCIDENT TABLE 
+
+CREATE TABLE county_accident
+AS
+SELECT ROWID, sum(num_accident) as num_accident, geometry as geometry
+FROM 
+(
+SELECT ROWID, count(*) as num_accident, ct_Geom as geometry
+FROM(	
+	SELECT ROWID, ac_Geom as acGeom, ct_Geom as ct_Geom
+	FROM(
+		SELECT ct.ROWID, ac.geometry as ac_Geom, ct.geometry as ct_Geom
+		FROM county_tunnel_info as ct,
+     	     	     Fatal_Motor_Vehicle_Accidents as ac
+		WHERE ac.ROWID IN(
+			SELECT ROWID
+			FROM SpatialIndex
+			WHERE f_table_name = 'Fatal_Motor_Vehicle_Accidents' AND f_geometry_column = 'GEOMETRY' AND
+		      	      search_frame = ST_Envelope(SetSRID(ct.geometry, 4326))
+		)
+	)
+	WHERE within(ac_Geom, ct_Geom)
+)
+GROUP By geometry
+UNION ALL
+SELECT ROWID, 0 as num_accident, geometry as geometry
+FROM cb_2016_us_county_500k as county
+)t
+GROUP By geometry
+
+
 
