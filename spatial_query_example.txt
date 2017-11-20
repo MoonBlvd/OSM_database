@@ -247,3 +247,39 @@ GROUP By geometry
 
 
 
+# QUERY ROAD where ACCIDENT happens
+CREATE TABLE road_accident
+AS
+SELECT *
+FROM(
+SELECT DISTINCT PK_UID, *
+FROM ('import.osm_roads') as rd,
+	Fatal_Motor_Vehicle_Accidents as ac
+WHERE ac.ROWID IN(
+	SELECT ROWID
+	FROM SpatialIndex
+	WHERE f_table_name = 'Fatal_Motor_Vehicle_Accidents' AND f_geometry_column = 'GEOMETRY' AND
+		search_frame = ST_Transform(rd.geometry, 4326)
+	)
+)t
+
+# QUERY ROAD where ACCIDENT happens
+
+SELECT ac.PK_UID
+FROM ('import.osm_roads') as rd,
+	Fatal_Motor_Vehicle_Accidents as ac
+WHERE ac.ROWID IN(
+	SELECT ROWID
+	FROM SpatialIndex
+	WHERE f_table_name = 'Fatal_Motor_Vehicle_Accidents' AND f_geometry_column = 'GEOMETRY' AND
+		search_frame = ST_Transform(rd.geometry, 4326)
+	)
+ORDER BY ST_Distance(ST_Transform(rd.geometry,4326), ac.geometry)
+LIMIT 1
+
+
+
+
+
+
+
