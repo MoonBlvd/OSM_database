@@ -247,3 +247,20 @@ GROUP By geometry
 
 
 
+
+# find the road and accidents
+CREATE TABLE road_accident
+AS
+SELECT *, min(distance)
+FROM(
+SELECT *, ST_Distance(ST_Transform(rd.geometry, 4326),ac.geometry) as distance
+FROM ('import.osm_roads') as rd,
+     Fatal_Motor_Vehicle_Accidents as ac
+WHERE ac.ROWID IN(
+	SELECT ROWID
+	FROM SpatialIndex
+	WHERE f_table_name = 'Fatal_Motor_Vehicle_Accidents' AND f_geometry_column = 'GEOMETRY' AND
+	      search_frame = ST_Envelope(ST_Transform(rd.geometry, 4326))
+)
+)
+Group by PK_UID
