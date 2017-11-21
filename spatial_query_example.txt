@@ -248,7 +248,8 @@ GROUP By geometry
 
 
 
-# find the road and accidents
+# QUERY ROAD where ACCIDENT happens
+
 CREATE TABLE road_accident
 AS
 SELECT *, min(distance)
@@ -264,3 +265,7 @@ WHERE ac.ROWID IN(
 )
 )
 Group by PK_UID
+
+
+
+
