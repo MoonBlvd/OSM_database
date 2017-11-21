@@ -267,5 +267,20 @@ WHERE ac.ROWID IN(
 Group by PK_UID
 
 
-
+# for IOWA
+CREATE TABLE IOWA_road_accident
+AS
+SELECT *, min(distance)
+FROM(
+SELECT *, ST_Distance(ST_Transform(rd.geometry, 4326),ac.geometry) as distance
+FROM iowa_osm as rd,
+     IOWA_Crash_Data as ac
+WHERE ac.ROWID IN(
+	SELECT ROWID
+	FROM SpatialIndex
+	WHERE f_table_name = 'IOWA_Crash_Data' AND f_geometry_column = 'GEOMETRY' AND
+	      search_frame = ST_Envelope(ST_Transform(rd.geometry, 4326))
+)
+)
+Group by PK_UID
 
