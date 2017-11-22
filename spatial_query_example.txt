@@ -284,26 +284,22 @@ WHERE ac.ROWID IN(
 )
 Group by PK_UID
 
-
 # match OSM road with AADT road
+CREATE TABLE osm_traffic
+AS
+SELECT *, MIN(distance)
+FROM 
+(
 SELECT *, ST_Distance(AADT2016.geometry,osm.geometry) as distance
 FROM michigan_road_osm as osm,
      2016_Traffic_Volumes as AADT2016
 WHERE osm.ROWID IN(
 	SELECT ROWID
 	FROM SpatialIndex
-	WHERE f_table_name = 'osm' AND f_geometry_column = 'GEOMETRY' AND
+	WHERE f_table_name = 'michigan_road_osm' AND f_geometry_column = 'GEOMETRY' AND
 	      search_frame = ST_Envelope(AADT2016.geometry)
 )
 
-
-# match OSM road with AADT road
-SELECT *, MIN(distance)
-FROM 
-(
-SELECT *, distance(AADT.geometry, osm.geometry) as distance
-FROM "2016_Traffic_Volumes" as AADT,
-	michigan_road_osm as osm
 )
 GROUP BY id
 
@@ -323,5 +319,21 @@ WHERE AADT2015.ROWID IN(
 )
 WHERE Equals(geom2015, geom2016)
 
+SELECT id AS osm_id, GEOMETRY AS osm_geom, GEOMETRY:1 AS AADT_geom, AadtRiybde AS AADT, CaadtRound AS CAADT
+FROM osm_traffic
+WHERE within(osm_geom, AADT_geom) or within(AADT_geom, osm_geom) or overlaps(AADT_geom, osm_geom) or covers(AADT_geom, osm_geom) or covers(osm_geom, AADT_geom)
 
+
+
+
+
+
+
+
+SELECT Distance(ST_Transform(end1,26915), ST_Transform(AADT_geom,26915)) as distance1, Distance(ST_Transform(end2,26915), ST_Transform(AADT_geom,26915)) as distance2
+FROM 
+(
+SELECT StartPoint(Geometry) as end1, EndPoint(Geometry) as end2, "Geometry:1" as AADT_geom
+FROM osm_traffic
+)
 
