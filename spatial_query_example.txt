@@ -330,10 +330,17 @@ WHERE within(osm_geom, AADT_geom) or within(AADT_geom, osm_geom) or overlaps(AAD
 
 
 
-SELECT Distance(ST_Transform(end1,26915), ST_Transform(AADT_geom,26915)) as distance1, Distance(ST_Transform(end2,26915), ST_Transform(AADT_geom,26915)) as distance2
+SELECT highway, 
+	Distance(ST_Transform(end1,26915), ST_Transform(AADT_geom,26915)) as distance1, 
+	Distance(ST_Transform(end2,26915), ST_Transform(AADT_geom,26915)) as distance2, 
+	Distance(ST_Transform(end3,26915), ST_Transform(osm_geom,26915)) as distance3, 
+	Distance(ST_Transform(end4,26915), ST_Transform(osm_geom,26915)) as distance4,
+	osm_geom, AADT_geom
 FROM 
 (
-SELECT StartPoint(Geometry) as end1, EndPoint(Geometry) as end2, "Geometry:1" as AADT_geom
+SELECT highway, StartPoint(Geometry) as end1, EndPoint(Geometry) as end2, 
+	StartPoint("Geometry:1") as end3, EndPoint("Geometry:1") as end4, 
+	Geometry as osm_geom, "Geometry:1" as AADT_geom
 FROM osm_traffic
+where highway is not NULL
 )
-
