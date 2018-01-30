@@ -91,6 +91,9 @@ Create the rough match table:
 
 ## Accurate match
 
+SRID 26915 is UTM Zone 15 N, NAD83.
+
+
 After the road segments are roughly matched,  
 
 	SELECT id, name, highway, StartPoint(osm.geometry) as end1, EndPoint(osm.geometry) as end2, StartPoint(AADT2016.geometry) as end3, EndPoint(AADT2016.geometry) as end4, osm.geometry as osm_geom, AADT2016.geometry as AADT_geom ,ST_Distance(AADT2016.geometry,osm.geometry) as distance
@@ -139,11 +142,32 @@ FInd the angles of osm road segments and AADT road segments after the rough matc
 
 
 
-	SELECT *
-	FROM 
+	CREATE TABLE accurate_match
+	AS
+	SELECT *, min(mid_distance + distance_1 + distance_2) as min_total_distance, geometry as Geometry
+	FROM
 	(
-		SELECT *, min(distance+distance_1+distance_2) as min_total_distance
-		FROM rough_match
-		GROUP BY id
+	SELECT *, ST_Distance(PointN(osm_geom,NumPoints(osm_geom)/2), AADT_geom) as mid_distance
+	FROM rough_match
+	WHERE (abs(new_osm_angle-new_AADT_angle) < 0.785398 OR abs(new_osm_angle-new_AADT_angle) > 2.792526) AND mid_distance < 0.00045
 	)
-	where
+	Group BY id
+	
+### match accident with road networks
+
+	CREATE TABLE accident_accurate_match
+	AS
+	SELECT *, min(ST_Distance(Geometry, osm_geom)) as min_distance
+	FROM
+	(
+	SELECT *
+	FROM Accident_2016 as ac,
+		 accurate_match as rd
+	WHERE ac.ROWID IN(
+		SELECT ROWID
+		FROM SpatialIndex
+		WHERE f_table_name = 'Accident_2016' AND f_geometry_column = 'GEOMETRY' AND
+		      search_frame = ST_Envelope(rd.geometry)
+	)
+	)GROUP BY crash_id
+
